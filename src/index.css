@@ -142,6 +142,20 @@ All colors MUST be HSL.
   @apply font-semibold text-foreground;
 }
 
+/* Brand enrichment styles */
+.brand-enriched {
+  @apply relative transition-all duration-200;
+}
+
+.brand-logo {
+  display: inline-block;
+  max-height: 20px;
+  width: auto;
+  margin-right: 8px;
+  vertical-align: middle;
+  opacity: 0.85;
+}
+
 /* Print styles */
 @media print {
   body * {
@@ -160,5 +174,16 @@ All colors MUST be HSL.
     width: 100%;
     box-shadow: none;
     padding: 40px;
+  }
+
+  .brand-logo {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .brand-enriched {
+    border-left-color: inherit !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
   }
 }
