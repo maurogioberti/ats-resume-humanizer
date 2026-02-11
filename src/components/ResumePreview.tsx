@@ -3,55 +3,57 @@ import { marked } from "marked";
 import DOMPurify from "dompurify";
 import { Button } from "@/components/ui/button";
 import { Printer } from "lucide-react";
-import { extractDomains, fetchBrands, type BrandData } from "@/lib/brandfetch";
+import { extractCompanies, fetchBrands, type BrandData } from "@/lib/brandfetch";
 
 interface ResumePreviewProps {
   markdown: string;
 }
 
 /**
- * Post-process the resume container to inject brand logos and accent borders
- * for any element whose text contains a detected domain.
+ * Post-process the resume container to enrich Work Experience headings
+ * with brand logos, accent borders, and verified badges.
  */
 function applyBrandEnrichment(
   container: HTMLElement,
-  brands: Map<string, BrandData>
+  brands: Map<string, BrandData>,
+  companyHeadings: Map<string, string> // domain -> headingText
 ) {
-  // Walk through all text-containing elements
-  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
-  const enriched = new Set<HTMLElement>();
+  const h3s = container.querySelectorAll("h3");
 
-  let node: Node | null;
-  while ((node = walker.nextNode())) {
-    const text = node.textContent?.toLowerCase() ?? "";
-    const parent = node.parentElement;
-    if (!parent || enriched.has(parent)) continue;
+  for (const h3 of h3s) {
+    const text = h3.textContent ?? "";
 
-    for (const [domain, brand] of brands) {
-      if (!text.includes(domain)) continue;
-      if (!brand.logoUrl && !brand.accentColor) continue;
+    for (const [domain, headingText] of companyHeadings) {
+      // Match if the h3 text contains the heading text (or a significant portion)
+      if (!text.includes(headingText.split(/\s[–—-]\s/)[0].trim())) continue;
 
-      // Find the closest block-level ancestor to decorate
-      const block = parent.closest("p, li, h3, div") as HTMLElement | null;
-      if (!block || enriched.has(block)) continue;
-      enriched.add(block);
+      const brand = brands.get(domain);
+      if (!brand || (!brand.logoUrl && !brand.accentColor)) continue;
+      if (h3.querySelector(".brand-logo")) continue; // already enriched
 
-      block.classList.add("brand-enriched");
+      h3.classList.add("brand-enriched");
 
       if (brand.accentColor) {
-        block.style.borderLeft = `3px solid ${brand.accentColor}`;
-        block.style.paddingLeft = "12px";
+        h3.style.borderLeft = `3px solid ${brand.accentColor}`;
+        h3.style.paddingLeft = "12px";
       }
 
       if (brand.logoUrl) {
-        // Avoid duplicate logos
-        if (block.querySelector(".brand-logo")) continue;
         const img = document.createElement("img");
         img.src = brand.logoUrl;
-        img.alt = `${domain} logo`;
+        img.alt = `${brand.companyName ?? domain} logo`;
         img.className = "brand-logo";
-        block.insertBefore(img, block.firstChild);
+        h3.insertBefore(img, h3.firstChild);
       }
+
+      if (brand.qualityScore > 0.66) {
+        const badge = document.createElement("span");
+        badge.className = "brand-verified-badge";
+        badge.textContent = "✓ Verified";
+        h3.appendChild(badge);
+      }
+
+      break; // one match per h3
     }
   }
 }
@@ -59,6 +61,7 @@ function applyBrandEnrichment(
 const ResumePreview = ({ markdown }: ResumePreviewProps) => {
   const [html, setHtml] = useState("");
   const [brands, setBrands] = useState<Map<string, BrandData>>(new Map());
+  const [companyHeadings, setCompanyHeadings] = useState<Map<string, string>>(new Map());
   const previewRef = useRef<HTMLDivElement>(null);
 
   // Convert markdown to HTML
@@ -70,13 +73,17 @@ const ResumePreview = ({ markdown }: ResumePreviewProps) => {
     convert();
   }, [markdown]);
 
-  // Fetch brand data for detected domains
+  // Extract companies and fetch brand data
   useEffect(() => {
-    const domains = extractDomains(markdown);
-    if (domains.length === 0) return;
+    const companies = extractCompanies(markdown);
+    if (companies.length === 0) return;
+
+    const headingsMap = new Map<string, string>();
+    companies.forEach((c) => headingsMap.set(c.domain, c.headingText));
+    setCompanyHeadings(headingsMap);
 
     let cancelled = false;
-    fetchBrands(domains).then((result) => {
+    fetchBrands(companies.map((c) => ({ domain: c.domain, companyName: c.companyName }))).then((result) => {
       if (!cancelled) setBrands(result);
     });
     return () => { cancelled = true; };
@@ -84,15 +91,14 @@ const ResumePreview = ({ markdown }: ResumePreviewProps) => {
 
   // Apply brand enrichment to rendered HTML
   useEffect(() => {
-    if (!previewRef.current || brands.size === 0) return;
-    // Small delay to ensure HTML is rendered
+    if (!previewRef.current || brands.size === 0 || companyHeadings.size === 0) return;
     const timeout = setTimeout(() => {
       if (previewRef.current) {
-        applyBrandEnrichment(previewRef.current, brands);
+        applyBrandEnrichment(previewRef.current, brands, companyHeadings);
       }
     }, 100);
     return () => clearTimeout(timeout);
-  }, [html, brands]);
+  }, [html, brands, companyHeadings]);
 
   return (
     <section className="mt-10">
