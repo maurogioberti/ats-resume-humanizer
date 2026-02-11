@@ -58,7 +58,22 @@ function applyBrandEnrichment(
         img.src = brand.logoUrl;
         img.alt = `${brand.name ?? domain} logo`;
         img.className = "brand-logo";
-        h3.insertBefore(img, h3.firstChild);
+
+        if (brand.logoTheme === "light") {
+          // Light logo (designed for dark bg) → wrap in dark container
+          const logoWrap = document.createElement("span");
+          logoWrap.className = "brand-logo-dark-bg";
+          logoWrap.appendChild(img);
+          h3.insertBefore(logoWrap, h3.firstChild);
+        } else if (brand.logoTheme === null) {
+          // Unknown theme → subtle fallback background
+          const logoWrap = document.createElement("span");
+          logoWrap.className = "brand-logo-fallback-bg";
+          logoWrap.appendChild(img);
+          h3.insertBefore(logoWrap, h3.firstChild);
+        } else {
+          h3.insertBefore(img, h3.firstChild);
+        }
       }
 
       // Add verified badge

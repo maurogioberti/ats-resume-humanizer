@@ -6,6 +6,7 @@ const API_BASE = "https://api.brandfetch.io/v2/brands/domain";
 export interface BrandData {
   name: string;
   logoUrl: string | null;
+  logoTheme: "light" | "dark" | null;
   accentColor: string | null;
   qualityScore: number;
 }
@@ -29,16 +30,20 @@ interface BrandFetchResponse {
 
 const brandCache = new Map<string, BrandData | null>();
 
-function pickLogo(logos: BrandFetchLogo[]): string | null {
+function pickLogo(logos: BrandFetchLogo[]): { url: string | null; theme: "light" | "dark" | null } {
   const preferred =
     logos.find((l) => l.type === "logo") ??
     logos.find((l) => l.type === "icon") ??
     logos[0];
-  if (!preferred?.formats?.length) return null;
+  if (!preferred?.formats?.length) return { url: null, theme: null };
   const svg = preferred.formats.find((f) => f.format === "svg");
   const png = preferred.formats.find((f) => f.format === "png");
   const webp = preferred.formats.find((f) => f.format === "webp");
-  return svg?.src ?? png?.src ?? webp?.src ?? preferred.formats[0]?.src ?? null;
+  const url = svg?.src ?? png?.src ?? webp?.src ?? preferred.formats[0]?.src ?? null;
+  const theme = (preferred as any).theme === "light" ? "light" as const
+    : (preferred as any).theme === "dark" ? "dark" as const
+    : null;
+  return { url, theme };
 }
 
 function pickAccentColor(colors: BrandFetchColor[]): string | null {
@@ -78,9 +83,11 @@ export async function fetchBrand(domain: string): Promise<BrandData | null> {
     }
 
     const data: BrandFetchResponse = await res.json();
+    const logo = pickLogo(data.logos ?? []);
     const brand: BrandData = {
       name: data.name ?? domain,
-      logoUrl: pickLogo(data.logos ?? []),
+      logoUrl: logo.url,
+      logoTheme: logo.theme,
       accentColor: pickAccentColor(data.colors ?? []),
       qualityScore: data.qualityScore ?? 0,
     };
