@@ -80,7 +80,7 @@ async function fetchBrand(domain: string, companyName?: string): Promise<BrandDa
 
 /** Extract company name from a heading like "Company Name – Role Title" */
 function extractCompanyName(heading: string): string {
-  // Take text before "–" or "-" (em dash or en dash or hyphen with spaces)
+  // Take text before "–" or "—" or " - "
   let name = heading.split(/\s[–—-]\s/)[0].trim();
   // If contains "/", take first part
   if (name.includes("/")) {
@@ -97,6 +97,11 @@ function companyToDomain(name: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]/g, "")
     + ".com";
+}
+
+/** Check if a string looks like a domain */
+function isDomain(text: string): boolean {
+  return /^[a-zA-Z0-9-]+\.[a-zA-Z]{2,}$/.test(text);
 }
 
 /** Extract companies from the Work Experience section of markdown */
@@ -125,11 +130,28 @@ export function extractCompanies(markdown: string): CompanyEntry[] {
     if (inWorkExperience && /^###\s+/.test(trimmed)) {
       const headingText = trimmed.replace(/^###\s+/, "");
       const companyName = extractCompanyName(headingText);
-      if (companyName && !seen.has(companyName.toLowerCase())) {
-        seen.add(companyName.toLowerCase());
+
+      // Check if the heading contains a direct domain (e.g. "Senior Engineer – google.com")
+      const parts = headingText.split(/\s[–—-]\s/);
+      let domain: string | null = null;
+      for (const part of parts) {
+        const cleaned = part.trim();
+        if (isDomain(cleaned)) {
+          domain = cleaned.toLowerCase();
+          break;
+        }
+      }
+
+      // Fallback: generate domain from company name
+      if (!domain) {
+        domain = companyToDomain(companyName);
+      }
+
+      if (domain && !seen.has(domain)) {
+        seen.add(domain);
         companies.push({
           companyName,
-          domain: companyToDomain(companyName),
+          domain,
           headingText,
         });
       }
