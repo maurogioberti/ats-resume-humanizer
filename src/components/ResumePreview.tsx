@@ -3,14 +3,14 @@ import { marked } from "marked";
 import DOMPurify from "dompurify";
 import { Button } from "@/components/ui/button";
 import { Printer } from "lucide-react";
-import { extractCompanies, fetchBrands, type BrandData } from "@/lib/brandfetch";
+import { extractCompanies, extractDomains, fetchBrands, type BrandData } from "@/lib/brandfetch";
 
 interface ResumePreviewProps {
   markdown: string;
 }
 
 /**
- * Post-process the resume container to enrich Work Experience headings
+ * Post-process the resume container to enrich elements
  * with brand logos, accent borders, and verified badges.
  */
 function applyBrandEnrichment(
@@ -18,18 +18,19 @@ function applyBrandEnrichment(
   brands: Map<string, BrandData>,
   companyHeadings: Map<string, string> // domain -> headingText
 ) {
+  // Enrich h3 headings from Work Experience
   const h3s = container.querySelectorAll("h3");
-
   for (const h3 of h3s) {
     const text = h3.textContent ?? "";
 
     for (const [domain, headingText] of companyHeadings) {
-      // Match if the h3 text contains the heading text (or a significant portion)
-      if (!text.includes(headingText.split(/\s[–—-]\s/)[0].trim())) continue;
+      // Match by domain appearing in text or by company name
+      const companyPart = headingText.split(/\s[–—-]\s/)[0].trim();
+      if (!text.includes(companyPart) && !text.toLowerCase().includes(domain)) continue;
 
       const brand = brands.get(domain);
       if (!brand || (!brand.logoUrl && !brand.accentColor)) continue;
-      if (h3.querySelector(".brand-logo")) continue; // already enriched
+      if (h3.querySelector(".brand-logo")) continue;
 
       h3.classList.add("brand-enriched");
 
@@ -53,7 +54,39 @@ function applyBrandEnrichment(
         h3.appendChild(badge);
       }
 
-      break; // one match per h3
+      break;
+    }
+  }
+
+  // Enrich inline domain mentions (bullet points, paragraphs)
+  const enriched = new Set<HTMLElement>();
+  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+  let node: Node | null;
+  while ((node = walker.nextNode())) {
+    const text = node.textContent?.toLowerCase() ?? "";
+    const parent = node.parentElement;
+    if (!parent || parent.tagName === "H3") continue; // skip already-handled h3s
+
+    for (const [domain, brand] of brands) {
+      if (!text.includes(domain)) continue;
+      if (!brand.logoUrl && !brand.accentColor) continue;
+
+      const block = parent.closest("p, li, div") as HTMLElement | null;
+      if (!block || enriched.has(block)) continue;
+      enriched.add(block);
+
+      block.classList.add("brand-enriched");
+      if (brand.accentColor) {
+        block.style.borderLeft = `3px solid ${brand.accentColor}`;
+        block.style.paddingLeft = "12px";
+      }
+      if (brand.logoUrl && !block.querySelector(".brand-logo")) {
+        const img = document.createElement("img");
+        img.src = brand.logoUrl;
+        img.alt = `${domain} logo`;
+        img.className = "brand-logo";
+        block.insertBefore(img, block.firstChild);
+      }
     }
   }
 }
@@ -73,17 +106,24 @@ const ResumePreview = ({ markdown }: ResumePreviewProps) => {
     convert();
   }, [markdown]);
 
-  // Extract companies and fetch brand data
+  // Extract companies + inline domains and fetch brand data
   useEffect(() => {
     const companies = extractCompanies(markdown);
-    if (companies.length === 0) return;
+    const inlineDomains = extractDomains(markdown);
 
     const headingsMap = new Map<string, string>();
     companies.forEach((c) => headingsMap.set(c.domain, c.headingText));
     setCompanyHeadings(headingsMap);
 
+    // Merge company domains + inline domains (deduplicated)
+    const allEntries = new Map<string, { domain: string; companyName?: string }>();
+    companies.forEach((c) => allEntries.set(c.domain, { domain: c.domain, companyName: c.companyName }));
+    inlineDomains.forEach((d) => { if (!allEntries.has(d)) allEntries.set(d, { domain: d }); });
+
+    if (allEntries.size === 0) return;
+
     let cancelled = false;
-    fetchBrands(companies.map((c) => ({ domain: c.domain, companyName: c.companyName }))).then((result) => {
+    fetchBrands(Array.from(allEntries.values())).then((result) => {
       if (!cancelled) setBrands(result);
     });
     return () => { cancelled = true; };
