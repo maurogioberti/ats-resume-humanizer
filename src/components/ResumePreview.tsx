@@ -18,13 +18,12 @@ function applyBrandEnrichment(
   brands: Map<string, BrandData>,
   companyHeadings: Map<string, string> // domain -> headingText
 ) {
-  // Enrich h3 headings from Work Experience
+  // Enrich h3 headings – logo + badge on heading, border on wrapping block
   const h3s = container.querySelectorAll("h3");
   for (const h3 of h3s) {
     const text = h3.textContent ?? "";
 
     for (const [domain, headingText] of companyHeadings) {
-      // Match by domain appearing in text or by company name
       const companyPart = headingText.split(/\s[–—-]\s/)[0].trim();
       if (!text.includes(companyPart) && !text.toLowerCase().includes(domain)) continue;
 
@@ -32,13 +31,28 @@ function applyBrandEnrichment(
       if (!brand || (!brand.logoUrl && !brand.accentColor)) continue;
       if (h3.querySelector(".brand-logo")) continue;
 
-      h3.classList.add("brand-enriched");
-
+      // Apply border to the job entry block (all siblings until next h3)
+      // Wrap h3 + following content in a container div
+      const wrapper = document.createElement("div");
+      wrapper.className = "job-entry-block";
       if (brand.accentColor) {
-        h3.style.borderLeft = `3px solid ${brand.accentColor}`;
-        h3.style.paddingLeft = "12px";
+        wrapper.style.borderLeft = `3px solid ${brand.accentColor}`;
+        wrapper.style.paddingLeft = "12px";
       }
 
+      // Collect h3 and its sibling elements until the next h3/h2
+      const siblings: Element[] = [];
+      let sibling = h3.nextElementSibling;
+      while (sibling && sibling.tagName !== "H3" && sibling.tagName !== "H2") {
+        siblings.push(sibling);
+        sibling = sibling.nextElementSibling;
+      }
+
+      h3.parentNode?.insertBefore(wrapper, h3);
+      wrapper.appendChild(h3);
+      for (const s of siblings) wrapper.appendChild(s);
+
+      // Add logo inline before heading text
       if (brand.logoUrl) {
         const img = document.createElement("img");
         img.src = brand.logoUrl;
@@ -47,6 +61,7 @@ function applyBrandEnrichment(
         h3.insertBefore(img, h3.firstChild);
       }
 
+      // Add verified badge
       if (brand.qualityScore > 0.66) {
         const badge = document.createElement("span");
         badge.className = "brand-verified-badge";
@@ -55,38 +70,6 @@ function applyBrandEnrichment(
       }
 
       break;
-    }
-  }
-
-  // Enrich inline domain mentions (bullet points, paragraphs)
-  const enriched = new Set<HTMLElement>();
-  const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT);
-  let node: Node | null;
-  while ((node = walker.nextNode())) {
-    const text = node.textContent?.toLowerCase() ?? "";
-    const parent = node.parentElement;
-    if (!parent || parent.tagName === "H3") continue; // skip already-handled h3s
-
-    for (const [domain, brand] of brands) {
-      if (!text.includes(domain)) continue;
-      if (!brand.logoUrl && !brand.accentColor) continue;
-
-      const block = parent.closest("p, li, div") as HTMLElement | null;
-      if (!block || enriched.has(block)) continue;
-      enriched.add(block);
-
-      block.classList.add("brand-enriched");
-      if (brand.accentColor) {
-        block.style.borderLeft = `3px solid ${brand.accentColor}`;
-        block.style.paddingLeft = "12px";
-      }
-      if (brand.logoUrl && !block.querySelector(".brand-logo")) {
-        const img = document.createElement("img");
-        img.src = brand.logoUrl;
-        img.alt = `${domain} logo`;
-        img.className = "brand-logo";
-        block.insertBefore(img, block.firstChild);
-      }
     }
   }
 }
