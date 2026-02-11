@@ -142,11 +142,21 @@ All colors MUST be HSL.
   @apply font-semibold text-foreground;
 }
 
-/* Brand enrichment styles */
-.brand-enriched {
-  @apply relative transition-all duration-200;
+/* Job entry block – wraps h3 + bullets with single left border */
+.job-entry-block {
+  margin-bottom: 24px;
 }
 
+.job-entry-block ul {
+  border-left: none !important;
+  padding-left: 24px;
+}
+
+.job-entry-block li {
+  border-left: none !important;
+}
+
+/* Brand enrichment styles */
 .brand-logo {
   display: inline-block;
   max-height: 20px;
@@ -158,14 +168,15 @@ All colors MUST be HSL.
 
 .brand-verified-badge {
   display: inline-block;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 500;
   color: hsl(var(--primary-foreground));
   background: hsl(var(--primary));
-  padding: 1px 8px;
+  padding: 1px 6px;
   border-radius: 9999px;
-  margin-left: 8px;
+  margin-left: 12px;
   vertical-align: middle;
+  opacity: 0.8;
 }
 
 /* Print styles */
@@ -193,7 +204,7 @@ All colors MUST be HSL.
     -webkit-print-color-adjust: exact;
   }
 
-  .brand-enriched {
+  .job-entry-block {
     border-left-color: inherit !important;
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
