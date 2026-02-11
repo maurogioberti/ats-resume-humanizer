@@ -1,13 +1,19 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { useState } from "react";
+import Header from "@/components/Header";
+import UploadSection from "@/components/UploadSection";
+import ResumePreview from "@/components/ResumePreview";
 
 const Index = () => {
+  const [markdown, setMarkdown] = useState<string | null>(null);
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="text-center">
-        <h1 className="mb-4 text-4xl font-bold">Welcome to Your Blank App</h1>
-        <p className="text-xl text-muted-foreground">Start building your amazing project here!</p>
+    <main className="min-h-screen bg-background py-12 px-4">
+      <div className="max-w-[900px] mx-auto">
+        <Header />
+        <UploadSection onGenerate={setMarkdown} />
+        {markdown && <ResumePreview markdown={markdown} />}
       </div>
-    </div>
+    </main>
   );
 };
 

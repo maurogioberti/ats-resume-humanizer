@@ -101,5 +101,64 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+    font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  }
+}
+
+/* Resume preview typography */
+.resume-preview h1 {
+  @apply text-3xl font-bold mb-2 text-foreground;
+}
+
+.resume-preview h2 {
+  @apply text-xl font-semibold mt-8 mb-3 pb-2 border-b border-border text-foreground;
+}
+
+.resume-preview h3 {
+  @apply text-lg font-semibold mt-4 mb-1 text-foreground;
+}
+
+.resume-preview p {
+  @apply mb-3 leading-relaxed text-foreground/90;
+}
+
+.resume-preview ul {
+  @apply list-disc pl-6 mb-4 space-y-1;
+}
+
+.resume-preview li {
+  @apply text-foreground/90 leading-relaxed;
+}
+
+.resume-preview a {
+  @apply text-primary underline underline-offset-2 hover:text-primary/80 transition-colors;
+}
+
+.resume-preview hr {
+  @apply my-6 border-border;
+}
+
+.resume-preview strong {
+  @apply font-semibold text-foreground;
+}
+
+/* Print styles */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+
+  #resume-preview,
+  #resume-preview * {
+    visibility: visible;
+  }
+
+  #resume-preview {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    box-shadow: none;
+    padding: 40px;
   }
 }
