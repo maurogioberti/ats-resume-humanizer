@@ -1,20 +1,13 @@
 // Brandfetch API integration for domain brand enrichment
 
 const API_KEY = import.meta.env.VITE_BRANDFETCH_API_KEY as string | undefined;
-const API_BASE = "https://api.brandfetch.io/v2/brands";
+const API_BASE = "https://api.brandfetch.io/v2/brands/domain";
 
 export interface BrandData {
-  domain: string;
-  companyName?: string;
+  name: string;
   logoUrl: string | null;
   accentColor: string | null;
   qualityScore: number;
-}
-
-export interface CompanyEntry {
-  companyName: string;
-  domain: string;
-  headingText: string;
 }
 
 interface BrandFetchLogo {
@@ -28,18 +21,24 @@ interface BrandFetchColor {
 }
 
 interface BrandFetchResponse {
+  name?: string;
   logos?: BrandFetchLogo[];
   colors?: BrandFetchColor[];
   qualityScore?: number;
 }
 
-const brandCache = new Map<string, BrandData>();
+const brandCache = new Map<string, BrandData | null>();
 
 function pickLogo(logos: BrandFetchLogo[]): string | null {
-  const preferred = logos.find((l) => l.type === "logo") ?? logos.find((l) => l.type === "icon") ?? logos[0];
+  const preferred =
+    logos.find((l) => l.type === "logo") ??
+    logos.find((l) => l.type === "icon") ??
+    logos[0];
   if (!preferred?.formats?.length) return null;
   const svg = preferred.formats.find((f) => f.format === "svg");
-  return svg?.src ?? preferred.formats[0]?.src ?? null;
+  const png = preferred.formats.find((f) => f.format === "png");
+  const webp = preferred.formats.find((f) => f.format === "webp");
+  return svg?.src ?? png?.src ?? webp?.src ?? preferred.formats[0]?.src ?? null;
 }
 
 function pickAccentColor(colors: BrandFetchColor[]): string | null {
@@ -47,12 +46,12 @@ function pickAccentColor(colors: BrandFetchColor[]): string | null {
   return accent?.hex ?? colors[0]?.hex ?? null;
 }
 
-async function fetchBrand(domain: string, companyName?: string): Promise<BrandData> {
-  const fallback: BrandData = { domain, companyName, logoUrl: null, accentColor: null, qualityScore: 0 };
+export async function fetchBrand(domain: string): Promise<BrandData | null> {
+  if (brandCache.has(domain)) return brandCache.get(domain)!;
 
   if (!API_KEY) {
     console.warn("Brandfetch API key not configured");
-    return fallback;
+    return null;
   }
 
   try {
@@ -60,48 +59,62 @@ async function fetchBrand(domain: string, companyName?: string): Promise<BrandDa
       headers: { Authorization: `Bearer ${API_KEY}` },
     });
 
-    if (res.status === 404) return fallback;
-    if (res.status === 401) { console.warn("Invalid Brandfetch API key"); return fallback; }
-    if (res.status === 429) { console.warn("Brandfetch quota exceeded"); return fallback; }
-    if (!res.ok) return fallback;
+    if (res.status === 404) {
+      brandCache.set(domain, null);
+      return null;
+    }
+    if (res.status === 401) {
+      console.warn("Invalid Brandfetch API key");
+      brandCache.set(domain, null);
+      return null;
+    }
+    if (res.status === 429) {
+      console.warn("Brandfetch quota exceeded");
+      return null;
+    }
+    if (!res.ok) {
+      console.warn("Brandfetch error", res.status);
+      return null;
+    }
 
     const data: BrandFetchResponse = await res.json();
-    return {
-      domain,
-      companyName,
+    const brand: BrandData = {
+      name: data.name ?? domain,
       logoUrl: pickLogo(data.logos ?? []),
       accentColor: pickAccentColor(data.colors ?? []),
       qualityScore: data.qualityScore ?? 0,
     };
-  } catch {
-    return fallback;
+
+    brandCache.set(domain, brand);
+    return brand;
+  } catch (error) {
+    console.warn("Brandfetch error", error);
+    return null;
   }
 }
 
 /** Extract company name from a heading like "Company Name – Role Title" */
-function extractCompanyName(heading: string): string {
-  // Take text before "–" or "—" or " - "
+export function extractCompanyName(heading: string): string {
   let name = heading.split(/\s[–—-]\s/)[0].trim();
-  // If contains "/", take first part
-  if (name.includes("/")) {
-    name = name.split("/")[0].trim();
-  }
-  // Remove anything inside parentheses
+  if (name.includes("/")) name = name.split("/")[0].trim();
   name = name.replace(/\([^)]*\)/g, "").trim();
   return name;
 }
 
 /** Generate a probable domain from a company name */
-function companyToDomain(name: string): string {
-  return name
-    .toLowerCase()
-    .replace(/[^a-z0-9]/g, "")
-    + ".com";
+export function companyToDomain(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]/g, "") + ".com";
 }
 
 /** Check if a string looks like a domain */
-function isDomain(text: string): boolean {
+export function isDomain(text: string): boolean {
   return /^[a-zA-Z0-9-]+\.[a-zA-Z]{2,}$/.test(text);
+}
+
+export interface CompanyEntry {
+  companyName: string;
+  domain: string;
+  headingText: string;
 }
 
 /** Extract companies from the Work Experience section of markdown */
@@ -114,24 +127,20 @@ export function extractCompanies(markdown: string): CompanyEntry[] {
   for (const line of lines) {
     const trimmed = line.trim();
 
-    // Detect Work Experience section (h2 level)
     if (/^##\s+(work\s+experience|experience|professional\s+experience)/i.test(trimmed)) {
       inWorkExperience = true;
       continue;
     }
 
-    // Exit when hitting another h2 section
     if (inWorkExperience && /^##\s+/.test(trimmed) && !/^###/.test(trimmed)) {
       inWorkExperience = false;
       continue;
     }
 
-    // Inside Work Experience, look for h3 headings (company entries)
     if (inWorkExperience && /^###\s+/.test(trimmed)) {
       const headingText = trimmed.replace(/^###\s+/, "");
       const companyName = extractCompanyName(headingText);
 
-      // Check if the heading contains a direct domain (e.g. "Senior Engineer – google.com")
       const parts = headingText.split(/\s[–—-]\s/);
       let domain: string | null = null;
       for (const part of parts) {
@@ -142,18 +151,11 @@ export function extractCompanies(markdown: string): CompanyEntry[] {
         }
       }
 
-      // Fallback: generate domain from company name
-      if (!domain) {
-        domain = companyToDomain(companyName);
-      }
+      if (!domain) domain = companyToDomain(companyName);
 
       if (domain && !seen.has(domain)) {
         seen.add(domain);
-        companies.push({
-          companyName,
-          domain,
-          headingText,
-        });
+        companies.push({ companyName, domain, headingText });
       }
     }
   }
@@ -161,7 +163,7 @@ export function extractCompanies(markdown: string): CompanyEntry[] {
   return companies;
 }
 
-/** Extract unique domains from raw markdown text (legacy) */
+/** Extract unique domains from raw markdown text */
 export function extractDomains(markdown: string): string[] {
   const matches = markdown.match(/([a-zA-Z0-9-]+\.[a-zA-Z]{2,})/g);
   if (!matches) return [];
@@ -175,26 +177,13 @@ export function extractDomains(markdown: string): string[] {
 }
 
 /** Fetch brand data for multiple domains with caching */
-export async function fetchBrands(entries: { domain: string; companyName?: string }[]): Promise<Map<string, BrandData>> {
-  const results = new Map<string, BrandData>();
-  const toFetch: { domain: string; companyName?: string }[] = [];
-
-  for (const e of entries) {
-    if (brandCache.has(e.domain)) {
-      results.set(e.domain, brandCache.get(e.domain)!);
-    } else {
-      toFetch.push(e);
-    }
-  }
-
-  const fetched = await Promise.allSettled(toFetch.map((e) => fetchBrand(e.domain, e.companyName)));
-
-  fetched.forEach((result, i) => {
-    const { domain, companyName } = toFetch[i];
-    const data = result.status === "fulfilled" ? result.value : { domain, companyName, logoUrl: null, accentColor: null, qualityScore: 0 };
-    brandCache.set(domain, data);
-    results.set(domain, data);
-  });
-
+export async function fetchBrands(domains: string[]): Promise<Map<string, BrandData | null>> {
+  const results = new Map<string, BrandData | null>();
+  await Promise.allSettled(
+    domains.map(async (d) => {
+      const brand = await fetchBrand(d);
+      results.set(d, brand);
+    })
+  );
   return results;
 }

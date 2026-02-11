@@ -42,7 +42,7 @@ function applyBrandEnrichment(
       if (brand.logoUrl) {
         const img = document.createElement("img");
         img.src = brand.logoUrl;
-        img.alt = `${brand.companyName ?? domain} logo`;
+        img.alt = `${brand.name ?? domain} logo`;
         img.className = "brand-logo";
         h3.insertBefore(img, h3.firstChild);
       }
@@ -116,14 +116,14 @@ const ResumePreview = ({ markdown }: ResumePreviewProps) => {
     setCompanyHeadings(headingsMap);
 
     // Merge company domains + inline domains (deduplicated)
-    const allEntries = new Map<string, { domain: string; companyName?: string }>();
-    companies.forEach((c) => allEntries.set(c.domain, { domain: c.domain, companyName: c.companyName }));
-    inlineDomains.forEach((d) => { if (!allEntries.has(d)) allEntries.set(d, { domain: d }); });
+    const allDomains = new Set<string>();
+    companies.forEach((c) => allDomains.add(c.domain));
+    inlineDomains.forEach((d) => allDomains.add(d));
 
-    if (allEntries.size === 0) return;
+    if (allDomains.size === 0) return;
 
     let cancelled = false;
-    fetchBrands(Array.from(allEntries.values())).then((result) => {
+    fetchBrands(Array.from(allDomains)).then((result) => {
       if (!cancelled) setBrands(result);
     });
     return () => { cancelled = true; };
