@@ -196,6 +196,33 @@ All colors MUST be HSL.
   opacity: 0.8;
 }
 
+/* Inline brand enrichment */
+.inline-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+
+.inline-brand--dark {
+  background-color: #d1d1d1;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.inline-brand-logo {
+  height: 14px;
+  width: auto;
+  object-fit: contain;
+  flex-shrink: 0;
+}
+
+.inline-brand-text {
+  display: inline;
+}
+
 /* Print styles */
 @media print {
   body * {
@@ -208,7 +235,7 @@ All colors MUST be HSL.
   }
 
   #resume-preview {
-    position: absolute;
+    position: fixed;
     left: 0;
     top: 0;
     width: 100%;

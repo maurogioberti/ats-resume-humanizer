@@ -11,6 +11,103 @@ interface ResumePreviewProps {
 }
 
 /**
+ * Enrich inline domains inside li, p, and span elements with lightweight branding.
+ */
+function enrichInlineDomains(
+  container: HTMLElement,
+  brands: Map<string, BrandData>
+) {
+  const targetElements = container.querySelectorAll("li, p, span");
+  for (const element of targetElements) {
+    // Process text nodes inside the element
+    const walker = document.createTreeWalker(
+      element,
+      NodeFilter.SHOW_TEXT,
+      null
+    );
+
+    const nodesToReplace: Array<{ node: Text; matches: RegExpExecArray[] }> = [];
+    let currentNode: Text | null;
+
+    while ((currentNode = walker.nextNode() as Text | null)) {
+      // Skip if already inside an inline-brand wrapper
+      if (currentNode.parentElement?.classList.contains("inline-brand")) {
+        continue;
+      }
+
+      const text = currentNode.textContent ?? "";
+      const matches: RegExpExecArray[] = [];
+      const regex = /([a-zA-Z0-9-]+\.(com|ai|org|net|io|co|dev|com\.ar))/gi;
+      let match;
+
+      while ((match = regex.exec(text))) {
+        matches.push(match);
+      }
+
+      if (matches.length > 0) {
+        nodesToReplace.push({ node: currentNode, matches });
+      }
+    }
+
+    // Replace matched domains with enriched spans
+    for (const { node, matches } of nodesToReplace) {
+      let lastIndex = 0;
+      const fragment = document.createDocumentFragment();
+
+      for (const match of matches) {
+        const domainText = match[1];
+        const matchIndex = match.index ?? 0;
+        const domainKey = normalizeDomain(domainText);
+
+        if (!domainKey) continue;
+
+        const brand = brands.get(domainKey);
+        if (!brand || !brand.logoUrl) continue;
+
+        // Add text before match
+        if (matchIndex > lastIndex) {
+          fragment.appendChild(
+            document.createTextNode(node.textContent!.slice(lastIndex, matchIndex))
+          );
+        }
+
+        // Create inline brand wrapper
+        const inlineBrand = document.createElement("span");
+        inlineBrand.className = "inline-brand";
+        if (brand.logoTheme === "light") {
+          inlineBrand.classList.add("inline-brand--dark");
+        }
+
+        // Add logo
+        const img = document.createElement("img");
+        img.src = brand.logoUrl;
+        img.alt = `${brand.name ?? domainKey} logo`;
+        img.className = "inline-brand-logo";
+        inlineBrand.appendChild(img);
+
+        // Add domain text
+        const text = document.createElement("span");
+        text.className = "inline-brand-text";
+        text.textContent = domainText;
+        inlineBrand.appendChild(text);
+
+        fragment.appendChild(inlineBrand);
+        lastIndex = matchIndex + domainText.length;
+      }
+
+      // Add remaining text
+      if (lastIndex < (node.textContent ?? "").length) {
+        fragment.appendChild(
+          document.createTextNode(node.textContent!.slice(lastIndex))
+        );
+      }
+
+      node.parentNode?.replaceChild(fragment, node);
+    }
+  }
+}
+
+/**
  * Post-process the resume container to enrich elements
  * with brand logos, accent borders, and verified badges.
  */
@@ -77,6 +174,8 @@ function applyBrandEnrichment(
       h3.appendChild(badge);
     }
   }
+
+  enrichInlineDomains(container, brands);
 }
 
 const ResumePreview = ({ markdown }: ResumePreviewProps) => {
