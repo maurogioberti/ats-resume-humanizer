@@ -157,43 +157,30 @@ All colors MUST be HSL.
 }
 
 /* Brand enrichment styles */
+.brand-logo-wrapper {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  min-width: 40px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  box-sizing: border-box;
+  background: transparent;
+  margin-right: 8px;
+  vertical-align: middle;
+  overflow: visible;
+}
+
+.brand-logo-wrapper--dark {
+  background-color: #111827;
+}
+
 .brand-logo {
-  display: inline-block;
-  max-height: 20px;
+  height: 18px;
   width: auto;
-  margin-right: 8px;
-  vertical-align: middle;
-  opacity: 0.85;
-}
-
-/* Dark container for light/white logos */
-.brand-logo-dark-bg {
-  display: inline-flex;
-  align-items: center;
-  background: #111;
-  padding: 4px 6px;
-  border-radius: 4px;
-  margin-right: 8px;
-  vertical-align: middle;
-}
-
-.brand-logo-dark-bg .brand-logo {
-  margin-right: 0;
-}
-
-/* Subtle fallback for unknown theme logos */
-.brand-logo-fallback-bg {
-  display: inline-flex;
-  align-items: center;
-  background: #f3f4f6;
-  padding: 4px 6px;
-  border-radius: 4px;
-  margin-right: 8px;
-  vertical-align: middle;
-}
-
-.brand-logo-fallback-bg .brand-logo {
-  margin-right: 0;
+  display: block;
+  object-fit: contain;
 }
 
 .brand-verified-badge {
@@ -229,7 +216,8 @@ All colors MUST be HSL.
     padding: 40px;
   }
 
-  .brand-logo {
+  .brand-logo,
+  .brand-logo-wrapper {
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
   }

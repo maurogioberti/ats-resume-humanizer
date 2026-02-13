@@ -31,6 +31,14 @@ interface BrandFetchResponse {
 const brandCache = new Map<string, BrandData | null>();
 let brandfetchBlocked = false;
 
+export function normalizeDomain(input: string): string {
+  let domain = input.trim().toLowerCase();
+  domain = domain.replace(/^https?:\/\//, "");
+  domain = domain.replace(/^www\./, "");
+  domain = domain.replace(/\/+$/, "");
+  return domain;
+}
+
 function pickLogo(logos: BrandFetchLogo[]): { url: string | null; theme: "light" | "dark" | null } {
   const preferred =
     logos.find((l) => l.type === "logo") ??
@@ -53,7 +61,9 @@ function pickAccentColor(colors: BrandFetchColor[]): string | null {
 }
 
 export async function fetchBrand(domain: string): Promise<BrandData | null> {
-  if (brandCache.has(domain)) return brandCache.get(domain)!;
+  const normalizedDomain = normalizeDomain(domain);
+  if (!normalizedDomain) return null;
+  if (brandCache.has(normalizedDomain)) return brandCache.get(normalizedDomain)!;
   if (brandfetchBlocked) return null;
   if (!API_KEY) {
     console.warn("Brandfetch API key not configured");
@@ -61,17 +71,17 @@ export async function fetchBrand(domain: string): Promise<BrandData | null> {
   }
 
   try {
-    const res = await fetch(`${API_BASE}/${domain}`, {
+    const res = await fetch(`${API_BASE}/${normalizedDomain}`, {
       headers: { Authorization: `Bearer ${API_KEY}` },
     });
 
     if (res.status === 404) {
-      brandCache.set(domain, null);
+      brandCache.set(normalizedDomain, null);
       return null;
     }
     if (res.status === 401) {
       console.warn("Invalid Brandfetch API key");
-      brandCache.set(domain, null);
+      brandCache.set(normalizedDomain, null);
       return null;
     }
     if (res.status === 429) {
@@ -87,14 +97,14 @@ export async function fetchBrand(domain: string): Promise<BrandData | null> {
     const data: BrandFetchResponse = await res.json();
     const logo = pickLogo(data.logos ?? []);
     const brand: BrandData = {
-      name: data.name ?? domain,
+      name: data.name ?? normalizedDomain,
       logoUrl: logo.url,
       logoTheme: logo.theme,
       accentColor: pickAccentColor(data.colors ?? []),
       qualityScore: data.qualityScore ?? 0,
     };
 
-    brandCache.set(domain, brand);
+    brandCache.set(normalizedDomain, brand);
     return brand;
   } catch (error) {
     console.warn("Brandfetch error", error);
@@ -155,12 +165,12 @@ export function extractCompanies(markdown: string): CompanyEntry[] {
       for (const part of parts) {
         const cleaned = part.trim();
         if (isDomain(cleaned)) {
-          domain = cleaned.toLowerCase();
+          domain = normalizeDomain(cleaned);
           break;
         }
       }
 
-      if (!domain) domain = companyToDomain(companyName);
+      if (!domain) domain = normalizeDomain(companyToDomain(companyName));
 
       if (domain && !seen.has(domain)) {
         seen.add(domain);
@@ -180,7 +190,7 @@ export function extractDomains(markdown: string): string[] {
   const ignore = new Set(["e.g", "i.e", "etc.com"]);
   const unique = new Set<string>();
   for (const m of matches) {
-    const lower = m.toLowerCase();
+    const lower = normalizeDomain(m);
     if (!ignore.has(lower)) unique.add(lower);
   }
   return Array.from(unique);
@@ -188,10 +198,9 @@ export function extractDomains(markdown: string): string[] {
 
 /** Fetch brand data for multiple domains with caching */
 export async function fetchBrands(domains: string[]): Promise<Map<string, BrandData | null>> {
-  const unique = Array.from(new Set(domains));
+  const normalized = domains.map(normalizeDomain).filter((d) => d.length > 0);
+  const unique = Array.from(new Set(normalized));
   const uncached = unique.filter((d) => !brandCache.has(d));
-  console.log(`[Brandfetch] ${unique.length} unique domains, ${uncached.length} API calls needed`);
-
   const results = new Map<string, BrandData | null>();
 
   for (const d of unique) {
