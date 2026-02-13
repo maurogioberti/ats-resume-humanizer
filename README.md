@@ -1,73 +1,103 @@
-# Welcome to your Lovable project
+# ATS Resume Humanizer
 
-## Project info
+Convert AI-readable (ATS) Markdown resumes into clean, human-readable
+branded PDF resumes.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+This project was built during a 2-hour hackathon using **Lovable
+(AI-assisted development)** and the **Brandfetch API**.\
+You can explore the commit history to see the AI-generated work and
+subsequent manual refinements and stabilization.
 
-## How can I edit this code?
+The goal was simple:
 
-There are several ways of editing your application.
+> Turn plain Markdown resumes into visually enriched, printable
+> documents with branding.
 
-**Use Lovable**
+## 🚀 Features
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+-   Markdown file upload
+-   Regex-based domain detection
+-   Brand logo enrichment via Brandfetch API
+-   Accent color styling per brand
+-   In-browser PDF export (print to PDF)
+-   Client-side caching to reduce API calls
+-   Graceful fallback if API rate limit is exceeded
 
-Changes made via Lovable will be committed automatically to this repo.
+## 🛠 Tech Stack
 
-**Use your preferred IDE**
+-   React
+-   Vite
+-   TypeScript
+-   Brandfetch API
+-   Lovable (AI-assisted coding)
+-   Bun / Node.js
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+## Requirements
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+- Node.js 18+ (Node 20 recommended)
+- Bun 1.0+ (optional)
 
-Follow these steps:
+## ⚙️ Setup
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+1.  Clone the repository:
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+```
+git clone https://github.com/maurogioberti/ats-resume-humanizer.git
+cd ats-resume-humanizer
+```
 
-# Step 3: Install the necessary dependencies.
-npm i
+2.  Create a `.env` file in the root directory:
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+```
+VITE_BRANDFETCH_API_KEY=your_brandfetch_api_key_here
+```
+
+### Option 1 — Using Bun
+
+3.  Install dependencies:
+
+```
+bun install
+```
+
+4.  Start development server:
+
+```
+bun run dev
+```
+
+### Option 2 — Using Node (npm)
+
+3.  Install dependencies:
+
+```
+npm install
+```
+
+4.  Start development server:
+
+```
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+## 🧠 How It Works
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+-   Extracts domains from Markdown using regex
+-   Deduplicates domains before API calls
+-   Fetches branding data from Brandfetch
+-   Applies logo and accent styling dynamically
+-   Falls back safely if API fails or rate limits
 
-**Use GitHub Codespaces**
+## 🎯 Hackathon Context
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+This project was developed under time constraints during a live
+hackathon.\
+The repository includes:
 
-## What technologies are used for this project?
+-   AI-generated commits via Lovable
+-   Manual post-hackathon refinements
+-   Stabilization and visual polishing
 
-This project is built with:
+## 📄 License
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+MIT
