@@ -29,6 +29,7 @@ interface BrandFetchResponse {
 }
 
 const brandCache = new Map<string, BrandData | null>();
+let brandfetchBlocked = false;
 
 function pickLogo(logos: BrandFetchLogo[]): { url: string | null; theme: "light" | "dark" | null } {
   const preferred =
@@ -53,7 +54,7 @@ function pickAccentColor(colors: BrandFetchColor[]): string | null {
 
 export async function fetchBrand(domain: string): Promise<BrandData | null> {
   if (brandCache.has(domain)) return brandCache.get(domain)!;
-
+  if (brandfetchBlocked) return null;
   if (!API_KEY) {
     console.warn("Brandfetch API key not configured");
     return null;
@@ -74,7 +75,8 @@ export async function fetchBrand(domain: string): Promise<BrandData | null> {
       return null;
     }
     if (res.status === 429) {
-      console.warn("Brandfetch quota exceeded");
+      console.warn("Brandfetch 429 – blocked for this session");
+      brandfetchBlocked = true;
       return null;
     }
     if (!res.ok) {
@@ -115,7 +117,7 @@ export function companyToDomain(name: string): string {
 
 /** Check if a string looks like a domain */
 export function isDomain(text: string): boolean {
-  return /^[a-zA-Z0-9-]+\.[a-zA-Z]{2,}$/.test(text);
+  return /^[a-zA-Z0-9-]+\.(com|ai|org|net|io|co|dev|com\.ar)$/i.test(text);
 }
 
 export interface CompanyEntry {
@@ -172,25 +174,38 @@ export function extractCompanies(markdown: string): CompanyEntry[] {
 
 /** Extract unique domains from raw markdown text */
 export function extractDomains(markdown: string): string[] {
-  const matches = markdown.match(/([a-zA-Z0-9-]+\.[a-zA-Z]{2,})/g);
+  const regex = /([a-zA-Z0-9-]+\.(com|ai|org|net|io|co|dev|com\.ar))/gi;
+  const matches = markdown.match(regex);
   if (!matches) return [];
   const ignore = new Set(["e.g", "i.e", "etc.com"]);
   const unique = new Set<string>();
   for (const m of matches) {
     const lower = m.toLowerCase();
-    if (!ignore.has(lower) && lower.includes(".")) unique.add(lower);
+    if (!ignore.has(lower)) unique.add(lower);
   }
   return Array.from(unique);
 }
 
 /** Fetch brand data for multiple domains with caching */
 export async function fetchBrands(domains: string[]): Promise<Map<string, BrandData | null>> {
+  const unique = Array.from(new Set(domains));
+  const uncached = unique.filter((d) => !brandCache.has(d));
+  console.log(`[Brandfetch] ${unique.length} unique domains, ${uncached.length} API calls needed`);
+
   const results = new Map<string, BrandData | null>();
-  await Promise.allSettled(
-    domains.map(async (d) => {
-      const brand = await fetchBrand(d);
-      results.set(d, brand);
-    })
-  );
+
+  for (const d of unique) {
+    if (brandCache.has(d)) results.set(d, brandCache.get(d)!);
+  }
+
+  for (const d of uncached) {
+    if (brandfetchBlocked) {
+      results.set(d, null);
+      continue;
+    }
+    const brand = await fetchBrand(d);
+    results.set(d, brand);
+  }
+
   return results;
 }
