@@ -82,6 +82,7 @@ function applyBrandEnrichment(
 const ResumePreview = ({ markdown }: ResumePreviewProps) => {
   const [html, setHtml] = useState("");
   const [brands, setBrands] = useState<Map<string, BrandData>>(new Map());
+  const [isEnriching, setIsEnriching] = useState(false);
   const previewRef = useRef<HTMLDivElement>(null);
 
   // Convert markdown to HTML
@@ -109,11 +110,16 @@ const ResumePreview = ({ markdown }: ResumePreviewProps) => {
       if (normalized) allDomains.add(normalized);
     });
 
-    if (allDomains.size === 0) return;
+    if (allDomains.size === 0) {
+      setIsEnriching(false);
+      return;
+    }
 
+    setIsEnriching(true);
     let cancelled = false;
     fetchBrands(Array.from(allDomains)).then((result) => {
       if (!cancelled) setBrands(result);
+      if (!cancelled) setIsEnriching(false);
     });
     return () => { cancelled = true; };
   }, [markdown]);
@@ -130,13 +136,23 @@ const ResumePreview = ({ markdown }: ResumePreviewProps) => {
   }, [html, brands]);
 
   return (
-    <section className="mt-10">
+    <section className="mt-10 relative">
       <div className="flex justify-end mb-3 print:hidden">
         <Button variant="outline" onClick={() => window.print()}>
           <Printer className="mr-2 h-4 w-4" />
           Download as PDF
         </Button>
       </div>
+
+      {isEnriching && (
+        <div className="resume-loading-overlay">
+          <div className="spinner"></div>
+          <p className="mt-3 text-sm text-muted-foreground">
+            Enriching brands...
+          </p>
+        </div>
+      )}
+
       <div
         ref={previewRef}
         id="resume-preview"
